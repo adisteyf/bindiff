@@ -1,34 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "defs.h"
 
 
 
 
-/*
-uint8_t bytecode[] = {
-	next, 0,
-	delt, 1,
-	next, 0,
-	addn, 1, 4,
-	quit
-};
-
-uint8_t oldfile[] = { / * 1, 3, 4, 4, 5 * /
-	1, 2, 3, 4, 5,
-};
-*/
-//uint8_t * oldfileptr = &oldfile[0];
-uint8_t * bytecode=0;
-uint8_t * oldfile =0;
-
+uint8_t * oldfile   =0;
+uint8_t * bytefile  =0;
+uint8_t * newfile   =0;
 uint8_t * oldfileptr=0;
 
-
-uint8_t bytefile[32] = { 0 };
-int32_t bytefile_len =   0  ;
-int32_t oldfile_len  =   0  ;
+uint64_t newfile_len=0;
+uint64_t oldfile_len=0;
+uint64_t newfile_cap=0;
 
 void
 load_files (char * oldname, char * patchname)
@@ -66,9 +52,9 @@ load_files (char * oldname, char * patchname)
 		fseek(patchf, 0, SEEK_END);
 		long size = ftell(patchf);
 		fseek(patchf, 0, SEEK_SET);
-		bytecode = malloc(size);
+		bytefile = malloc(size);
 
-		uint8_t * ptr = bytecode;
+		uint8_t * ptr = bytefile;
 		int c = getc(patchf);
 		while (c != EOF) {
 			*ptr = (uint8_t)c;
@@ -83,7 +69,8 @@ load_files (char * oldname, char * patchname)
 void
 free_mem (void)
 {
-	free(bytecode);
+	free(bytefile);
+	free(newfile);
 	free(oldfile);
 }
 
@@ -95,31 +82,43 @@ load_cmd (uint8_t * cmd)
 
 	switch (inst) {
 case next: {
-	uint8_t i = *cmd; i++;
+	uint32_t i = *((int*)cmd);
+	i++;
+	cmd += 3;
+
 	while (i--) {
-		bytefile[bytefile_len++] = *oldfileptr;
+		newfile[newfile_len++] = *oldfileptr;
 		oldfileptr++;
 	}
 
 	cmd++;
 	break;
 }
-case repl:
-	break;
-case addn: {
-		bytefile[bytefile_len++] = *oldfileptr;
+case repl: {
+	uint32_t i = *((int*)cmd);
+	cmd += 3;
+	while (i--) {
+		cmd++;
+		newfile[newfile_len++] = *cmd;
 		oldfileptr++;
-		uint8_t i = *cmd;
+	}
+
+	break;
+}
+case addn: {
+		newfile[newfile_len++] = *oldfileptr;
+		oldfileptr++;
+		uint8_t i = *((int*)cmd); cmd += 3;
 		while (i--) {
 			cmd++;
-			bytefile[bytefile_len++] = *cmd;
+			newfile[newfile_len++] = *cmd;
 		}
 
 		cmd++;
 		break;
 }
 case delt: {
-	uint8_t i = *cmd;
+	uint32_t i = *((int*)cmd); cmd += 3;
 	while (i--) {
 		oldfileptr++;
 	}
@@ -128,10 +127,9 @@ case delt: {
 	break;
 }
 case quit: {
-			int32_t i = 
-				oldfile_len - (oldfileptr - oldfile);
+			int32_t i = oldfile_len - (oldfileptr - oldfile);
 			while (i--) {
-				bytefile[bytefile_len++] = *oldfileptr;
+				newfile[newfile_len++] = *oldfileptr;
 				oldfileptr++;
 			}
 
@@ -148,9 +146,9 @@ case quit: {
 void
 print_file (void)
 {
-	int32_t tmp = bytefile_len;
+	int32_t tmp = newfile_len;
 	while (tmp--) {
-		printf("%c",bytefile[bytefile_len-tmp-1]);
+		printf("%c",newfile[newfile_len-tmp-1]);
 	}
 }
 
@@ -160,8 +158,17 @@ main (int argc, char ** argv)
 {
 	if (argc < 3) { return 2; }
 	load_files(argv[1], argv[2]);
+	uint8_t * cmd = &bytefile[0];
 
-	uint8_t * cmd = &bytecode[0];
+	uint8_t cap[8] = { 0 };
+	int32_t i=8;
+	while (i--) {
+		cap[7-i] = *cmd;
+		cmd++;
+	}
+
+	memcpy(&newfile_cap,cap,sizeof(uint64_t));
+	newfile = malloc(newfile_cap);
 	for (;;) {
 		cmd = load_cmd(cmd);
 	}

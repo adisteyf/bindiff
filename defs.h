@@ -18,6 +18,9 @@
 /* functions */
 uint8_t * load_cmd   (uint8_t * cmd);
 void      print_file (void);
+void      free_mem   (void);
+void      load_files (char * oldname, char * patchname);
+void			load_file  (char * filename);
 
 
 #endif // __BDIFF_DEFS_H

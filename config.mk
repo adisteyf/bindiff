@@ -1,0 +1,4 @@
+
+CC = tcc
+CFLAGS = -g
+
